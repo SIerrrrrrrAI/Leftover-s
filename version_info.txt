@@ -17,7 +17,7 @@ VSVersionInfo(
         [
         StringStruct('CompanyName', ''),
         StringStruct('FileDescription', "Leftover's"),
-        StringStruct('FileVersion', '0.8.0'),
+        StringStruct('FileVersion', '1.8.0'),
         StringStruct('InternalName', 'Leftovers'),
         StringStruct('LegalCopyright', 'Copyright 2026'),
         StringStruct('OriginalFilename', "Leftover's.exe"),
