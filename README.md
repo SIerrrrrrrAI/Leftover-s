@@ -36,7 +36,7 @@ A folder that still belongs to an installed program
 
 
 
-A folder a running program or Windows service is using
+A folder running program or Windows service is using
 
 
 
