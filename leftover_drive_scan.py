@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Leftover's  v0.8.0
+Leftover's  v1.8.0
 Windows only. Notepad++: Encoding UTF-8, then run with Python 3.
 
 Scans selected local drives, including Program Files and Program Files (x86).
