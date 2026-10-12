@@ -1,13 +1,3 @@
-Leftover's Copyright <2026> <Erick A Sierra JR>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-
 Leftover's  finds folders left behind after programs are removed, plus caches and temporary files that no longer belong to an installed application. It is a Windows cleanup tool. It is not a full disk wipe, and it does not uninstall Windows.
 
 The goal is to show you space that looks safe to reclaim, then let you choose what goes to the Recycle Bin. Nothing is deleted until you select it and confirm. Dry-run is on the first time you open the program, so a delete only writes a practice line in the log until you turn Dry-run off.
