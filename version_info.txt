@@ -22,7 +22,7 @@ VSVersionInfo(
         StringStruct('LegalCopyright', 'Copyright 2026'),
         StringStruct('OriginalFilename', "Leftover's.exe"),
         StringStruct('ProductName', "Leftover's"),
-        StringStruct('ProductVersion', '0.8.0')
+        StringStruct('ProductVersion', '1.8.0')
         ])
       ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
