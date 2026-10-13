@@ -2,10 +2,13 @@
 setlocal EnableExtensions
 title Build Leftover's
 cd /d "%~dp0"
+if not exist "Leftover's" mkdir "Leftover's"
 echo.
 echo This builds:
 echo   dist\Leftover's.exe
 echo   dist\Leftover's Setup.exe
+echo Then copies both into:
+echo   Leftover's\
 echo.
 set "PY="
 where py >nul 2>&1
@@ -89,14 +92,14 @@ if exist leftover_icon.b64 del /q leftover_icon.b64
 >>leftover_icon.b64 echo MzEx/zMxMf8zMTH/MzEx/zMxMf8zMTH/MzEx/zMxMf8zMTH/MzEx/zMxMf8zMTH/MzEx/zMxMf8zMTH/NjMz/zQyMf80MjH/MzEx/zMxMf80MjH/NDEx/zQy
 >>leftover_icon.b64 echo Mf8zMTH/NTM0/y8uKv8uLiv/Li4o/zUzMv8zMTH/MzEx/zMxMf8zMTH/MzEx/zQyMv80MjL/NDIy/zQyMf8zMTH/NDIy/zMxMf8zMTH/MzEx/zMxMf80MjH/
 >>leftover_icon.b64 echo MzEx/zUzM/9XVlX/Liws/zY0NP80MjL/NDIy/zQyMv80MjL/NDIy/zQyMv80MjL/NTM0/zUzM/81MzT/NDIy/zQyMv80MjL/NDIy/zQyMv80MjL/NDIy/zQy
->>leftover_icon.b64 echo Mv80MjL/NDIy/zQyMv80MjL/NDIy/zQyMv80MjL/NDIy/zQyMv80MjL/NDIy/zUzM/8uLCz/V1VV/7GwsP8oJib/OTc2/zUzM/81MzP/NTMz/zUzM/81MzP/
->>leftover_icon.b64 echo NTMz/zQyMv81MjL/NTMz/zUzM/80MjL/NDIy/zUzM/81MzP/NTMz/zUzM/81MzP/NTMz/zUzM/81MzP/NDIy/zQyMv81MzP/NTMy/zUzM/81MzP/OTc3/ygm
->>leftover_icon.b64 echo Jv+xsLD//v39/3FwcP8hHx//OTc3/zc1Nf81MzP/NTMz/zUzM/81MzP/NTMz/zUzM/82NDT/NjQ0/zUzM/81MzP/NTMz/zUzM/81MzP/NTMz/zUzM/81MzP/
->>leftover_icon.b64 echo NjQz/zUzM/81MzP/NTMz/zUzM/81MzP/NzU1/zk3N/8hHx//cW9v//3+/v/+/v7/9fX1/3Bvb/8qKCj/MC4u/zY0NP82NDT/NjQ0/zUzM/81MzP/NjQ0/zY0
->>leftover_icon.b64 echo NP82NDT/NjQ0/zY0NP82NDT/NTMz/zY0NP82NDT/NTMz/zY0M/81MzP/NjQ0/zUzM/81MzP/NTMz/zUzM/81MzP/MC0t/yknJ/9vbm7/9PT0//7+/v/+/v7/
->>leftover_icon.b64 echo /////////////62srP9ZWFj/OTc3/zY0NP82NDT/NjQ0/zY0NP82NDT/NjQ0/zY0NP82NDT/NTMz/zY0NP82NDT/NjQ0/zY0NP82NDT/NjQ0/zY0NP82MzP/
->>leftover_icon.b64 echo NjQ0/zY0M/81MzP/ODY2/1lXV/+trKz////////////+/v7/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
->>leftover_icon.b64 echo AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+>>leftover_icon.b64 echo Mv80MjL/NDIy/zQyMv80MjL/NDIy/zQyMv80MjL/NDIy/zUzM/8uLCz/V1VV/7GwsP8oJib/OTc2/zUzM/81MzP/NTMz/zUzM/81MzP/NTMz/zQyMv81MjL/
+>>leftover_icon.b64 echo NTMz/zUzM/80MjL/NDIy/zUzM/81MzP/NTMz/zUzM/81MzP/NTMz/zUzM/81MzP/NDIy/zQyMv81MzP/NTMy/zUzM/81MzP/OTc3/ygmJv+xsLD//v39/3Fw
+>>leftover_icon.b64 echo cP8hHx//OTc3/zc1Nf81MzP/NTMz/zUzM/81MzP/NTMz/zUzM/82NDT/NjQ0/zUzM/81MzP/NTMz/zUzM/81MzP/NTMz/zUzM/81MzP/NjQz/zUzM/81MzP/
+>>leftover_icon.b64 echo NTMz/zUzM/81MzP/NzU1/zk3N/8hHx//cW9v//3+/v/+/v7/9fX1/3Bvb/8qKCj/MC4u/zY0NP82NDT/NjQ0/zUzM/81MzP/NjQ0/zY0NP82NDT/NjQ0/zY0
+>>leftover_icon.b64 echo M/81MzP/NjQ0/zY0NP81MzP/NjQz/zUzM/82NDT/NTMz/zUzM/81MzP/NTMz/zUzM/8wLS3/KScn/29ubv/09PT//v7+//7+/v///////////62srP9ZWFj/
+>>leftover_icon.b64 echo OTc3/zY0NP82NDT/NjQ0/zY0NP82NDT/NjQ0/zY0NP82NDT/NTMz/zY0NP82NDT/NjQ0/zY0NP82NDT/NjQ0/zY0NP82MzP/NjQ0/zY0M/81MzP/ODY2/1lX
+>>leftover_icon.b64 echo V/+trKz////////////+/v7/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+>>leftover_icon.b64 echo AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 "%PY%" -c "import base64,pathlib; pathlib.Path('leftover_icon_32.ico').write_bytes(base64.b64decode(pathlib.Path('leftover_icon.b64').read_text().replace(chr(10),'').replace(chr(13),'')))"
 if not exist leftover_icon_32.ico (
   echo The icon file was not written.
@@ -131,7 +134,11 @@ if errorlevel 1 (
 )
 echo.
 echo Done.
+if not exist "Leftover's" mkdir "Leftover's"
+copy /y "dist\Leftover's.exe" "Leftover's\"
+copy /y "dist\Leftover's Setup.exe" "Leftover's\"
 echo   %cd%\dist\Leftover's.exe
 echo   %cd%\dist\Leftover's Setup.exe
+echo   %cd%\Leftover's\
 pause
 endlocal
