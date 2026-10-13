@@ -1,144 +1,51 @@
-Leftover Cleaner Prototype
-0.1.0 — first prototype
+Early builds
 
-Windows-only Python window for Notepad++.
-Reads installed apps from the registry.
-Scans AppData, ProgramData, and Temp for leftover folders.
-Matches folder names to installed apps and shows a basic confidence score.
-Shows size, a select box, and Delete.
-Delete sends the folder to the Recycle Bin.
-Dry-run is on by default.
-Writes a log.
-Refuses Windows system paths.
-
-0.2.0 — stop deleting things that are still installed
-
-Compares leftover folders with each app’s install location.
-Skips a folder when an installed app still owns it.
-Looks inside subfolders for leftovers that have no application.
-Sort by path A–Z and Z–A.
-Sort by size, largest to smallest.
-Dark mode.
-The version number is shown in the window title.
-
-0.3.0 — tree and right-click
-
-Paths are shown as a tree you can open and close.
-Each row has a checkbox that selects and deselects.
-Right-click menu: Delete, Open file location, Copy path.
-Shift+F10 and the menu key open the same menu.
-Deleting a row no longer collapses the whole tree.
-Sorting no longer collapses the tree.
-You can delete the parent folder that is holding the leftover files, not only the files inside it.
-
-0.4.0 — better matching and uninstallers
-
-Matching uses the folder name, the publisher, and the install folder together.
-Confidence is higher only when more than one of those agrees.
-Installed-apps tab lists official uninstallers and can run them.
-Also finds leftover uninstallers such as unins000.exe and uninstall.exe.
-The console stays open on a crash and writes the error instead of closing immediately.
-Dark theme is applied before the window is built, so it no longer opens as a white window.
-
-0.5.0 — hardware and speed
-
-Reads the PC’s BIOS, CPU, and GPU from the registry.
-Protects OEM folders that belong to that hardware: NVIDIA, Intel, AMD, Realtek, Dell, HP, Lenovo, ASUS, MSI, Acer, Gigabyte.
-Protects a folder when a parent program, or a “father” program file, is still installed.
-Skips Microsoft core components and other manufacturer core files.
-Saves folder sizes in a cache so the next scan is faster.
-Recycle Bin deletion refuses hardware and OEM paths.
-
-0.5.2 — last prototype
-
-Anything with Nahimic or A-Volute in the name is protected.
-A crash writes crash.txt next to the script, says what failed, and opens that file.
-Fixes for the window not opening: missing color settings, a bad theme line, and a broken indent.
-This is the last version of leftover_cleaner.py. Later work moved to the drive scanner.
-
-Microsoft App Remover 1.0.0
-This is a different program, ms_app_remover.py. It does not scan leftover folders.
-
-Lists Microsoft Store apps with PowerShell.
-Lets you choose which optional ones to remove.
-Locks Edge, Defender, the Store, Windows itself, framework packages, and anything Windows marks non-removable.
-Asks you to make a System Restore point and can create that point.
-Can relaunch itself as Administrator.
-Dry-run stays on until you turn it off.
-Dark window.
-Writes a log of every action.
-Does not delete System32, services, or drivers.
-
-Leftover's (drive scanner)
-0.6.0 — new scanner
-
-New file, leftover_drive_scan.py. The old prototype was not extended.
-Can scan C: and any other fixed or USB drive.
-Includes Program Files and Program Files (x86).
-Still skips Windows, personal documents, pictures, music, video, and desktop files.
-Skips a folder when a running process or a Windows service is using it.
-Local Ollama can review folders the rules are not sure about.
-The app checks the model’s answer again and throws it out if the folder is protected.
-The chosen model is saved in ai_link.json.
-Link AI checks whether Ollama is installed, starts it, and can download a model.
-Default model is hermes3.
-Recently deleted items are listed from this tool and from the Recycle Bin.
-
-0.7.0 — the agent is visible
-
-ms_app_remover.py removed for further testing
-The agent window opens when the cleaner opens.
-It greets you, shows free space on each drive, the last scan time, and how much space was restored.
-The agent writes its answer after a search finishes, not one word at a time.
-A folder with its own .exe or shortcut is treated as still installed and is not recommended.
-Right-click menu is in this program too: select, open location, copy path, run a leftover uninstaller, delete.
-
-0.7.5 — stop at a program file
-
-When a real program .exe or shortcut is found, scanning that folder stops and moves on.
-Uninstallers do not count as the program. uninstall.exe and unins000.exe do not stop the scan.
-At the end, a dialog lists every folder where scanning stopped.
-The same list is written in the agent window.
-Windows, OEM, Nahimic, installed apps, and in-use folders are still refused even if the model suggests them.
-
-1.8.0 
-
-The program is named Leftover's.
-The window title, shortcuts, and file details use that name.
-The eraser icon is on the cleaner window, the setup window, and both .exe files.
-build_exe.bat builds two programs:
-dist\Leftover's.exe
-dist\Leftover's Setup.exe
-reimplemented uninstaller/leftover installer finder
-  
-The builder writes the icon itself. You do not have to supply an .ico file.
-version_info.txt puts version 0.8.0 into the .exe properties.
-The setup wizard asks before it installs anything.
-Python is optional, because the finished .exe already contains it.
-Ollama and the hermes3 download are optional and only happen if you leave those boxes checked.
-The wizard copies the cleaner, can make Desktop and Start menu shortcuts, and can open Leftover's when setup finishes.
-Dry-run is still on until you turn it off.
+Windows app that lists leftover folders and sends them to the Recycle Bin.
+It skips Windows, Microsoft, OEM, Nahimic, personal files, and anything still installed or running.
+Tree list, checkboxes, right-click menu, sort by path or size.
+Dry-run, a log, and a crash file.
+Local Ollama helper. Scan stops when a folder still has a program.
+Setup wizard, icon, and an exe named Leftover's.
 
 1.8.1
 
-Renamed the window header and added a GitHub button to SIerrrrrrrAI/Leftover-s.
-Split the toolbar so Scan, delete, drives, and the agent are not crushed on one row.
-Removed the line "I will write my answer here after each search finishes. Not one word at a time."
-Added an Agent tab. Chat is only about the current scan.
-A message such as search C: for cache folders larger than 200 MB runs a narrower scan. The agent then answers from those results.
-Link AI matches hermes3 to hermes3:latest and accepts either a JSON reply or a plain ok. Chat stays locked until that link is proved.
+Chat with Helper about the scan.
+GitHub button.
 
-1.9.0
+1.9.1
 
-Replaced the dark blue theme with an older brutalist look: paper background, black ink, Courier masthead, thick borders, and yellow Scan, Link AI, Send, and Next buttons.
-The setup wizard uses the same look.
-File version and product version in  are 1.9.0.
-The old leftover prototype stays 0.5.2. Microsoft App Remover stays 1.0.0. Those are separate programs.
+Paper background, black borders, yellow buttons.
 
-1.9.1 — current
+1.9.2
 
-The agent can check the public web, but only for a question about Leftover's, a file or folder, or this Windows system.
-Off-topic questions are refused before any search.
-A drive search such as search C: for cache folders still searches this PC only. It goes to the web only when the message is also a question, such as "what is safe to remove."
-The agent must answer from the pages it found and name the page title. It still cannot delete files, and it still refuses Windows, OEM, Nahimic, installed apps, and folders that contain a real program.
-Cleaner, setup wizard, and  are all 1.9.1.
+Helper can use the web for program, file, and system questions.
+A folder is kept when a program on another drive still needs it.
+
+1.9.3
+
+Helper reads files you can already open.
+A folder is kept when those files name another program.
+
+1.9.4
+
+Protocol H.M.N. The assistant is named Helper.
+One answer. This PC wins over the web.
+
+1.9.5
+
+Link AI reads them in the background.
+File names can be checked on the web and with other local models.
+
+1.9.6
+
+Link success shows one line and beeps.
+The Helper window opens correctly.
+Jailbreak and dangerous-recipe requests get one refusal.
+Helper is an assistant, not an unrestricted agent.
+Keep it simple.
+The build makes a Leftover's folder and copies both exes into it.
+
+1.9.7
+
+The app asks you to run as administrator.
+A dark screen covers the window until Helper is linked, then it goes away.
