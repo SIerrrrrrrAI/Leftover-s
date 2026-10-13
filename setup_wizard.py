@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Leftover's Setup  v0.8.0
+Leftover's Setup  v1.8.0
 
 Windows setup wizard. Build it on Windows with build_exe.bat.
 The finished file is dist\Leftover's Setup.exe.
