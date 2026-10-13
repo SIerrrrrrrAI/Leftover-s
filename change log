@@ -101,7 +101,7 @@ At the end, a dialog lists every folder where scanning stopped.
 The same list is written in the agent window.
 Windows, OEM, Nahimic, installed apps, and in-use folders are still refused even if the model suggests them.
 
-1.8.0 — current
+1.8.0 
 
 The program is named Leftover's.
 The window title, shortcuts, and file details use that name.
@@ -109,7 +109,8 @@ The eraser icon is on the cleaner window, the setup window, and both .exe files.
 build_exe.bat builds two programs:
 dist\Leftover's.exe
 dist\Leftover's Setup.exe
-
+reimplemented uninstaller/leftover installer finder
+  
 The builder writes the icon itself. You do not have to supply an .ico file.
 version_info.txt puts version 0.8.0 into the .exe properties.
 The setup wizard asks before it installs anything.
@@ -117,3 +118,27 @@ Python is optional, because the finished .exe already contains it.
 Ollama and the hermes3 download are optional and only happen if you leave those boxes checked.
 The wizard copies the cleaner, can make Desktop and Start menu shortcuts, and can open Leftover's when setup finishes.
 Dry-run is still on until you turn it off.
+
+1.8.1
+
+Renamed the window header and added a GitHub button to SIerrrrrrrAI/Leftover-s.
+Split the toolbar so Scan, delete, drives, and the agent are not crushed on one row.
+Removed the line "I will write my answer here after each search finishes. Not one word at a time."
+Added an Agent tab. Chat is only about the current scan.
+A message such as search C: for cache folders larger than 200 MB runs a narrower scan. The agent then answers from those results.
+Link AI matches hermes3 to hermes3:latest and accepts either a JSON reply or a plain ok. Chat stays locked until that link is proved.
+
+1.9.0
+
+Replaced the dark blue theme with an older brutalist look: paper background, black ink, Courier masthead, thick borders, and yellow Scan, Link AI, Send, and Next buttons.
+The setup wizard uses the same look.
+File version and product version in  are 1.9.0.
+The old leftover prototype stays 0.5.2. Microsoft App Remover stays 1.0.0. Those are separate programs.
+
+1.9.1 — current
+
+The agent can check the public web, but only for a question about Leftover's, a file or folder, or this Windows system.
+Off-topic questions are refused before any search.
+A drive search such as search C: for cache folders still searches this PC only. It goes to the web only when the message is also a question, such as "what is safe to remove."
+The agent must answer from the pages it found and name the page title. It still cannot delete files, and it still refuses Windows, OEM, Nahimic, installed apps, and folders that contain a real program.
+Cleaner, setup wizard, and  are all 1.9.1.
