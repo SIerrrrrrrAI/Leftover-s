@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Leftover's  v1.8.0
+Leftover's  v1.9.1
 Windows only. Notepad++: Encoding UTF-8, then run with Python 3.
 
 Scans selected local drives, including Program Files and Program Files (x86).
@@ -11,6 +11,7 @@ Dry-run is on until you turn it off.
 """
 
 import os
+import re
 import sys
 import json
 import ctypes
@@ -20,12 +21,15 @@ import threading
 import traceback
 import subprocess
 import shutil
+import webbrowser
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from datetime import datetime
 
 APP_NAME = "Leftover's"
-VERSION = "0.8.0"
+VERSION = "1.9.1"
+GITHUB_URL = "https://github.com/SIerrrrrrrAI/Leftover-s"
 
 if sys.platform != "win32":
     print("This script only runs on Windows.")
@@ -77,7 +81,16 @@ BLOCK_PREFIXES = (
     "nahimic", "avolute", "dotnet",
 )
 
-DARK = {"bg": "#1b1b1b", "fg": "#e6e6e6", "field": "#2a2a2a", "button": "#3a3a3a", "select": "#0a84ff", "ok": "#7dcea0", "warn": "#e0a100"}
+DARK = {
+    "bg": "#d7d1c5",
+    "fg": "#111111",
+    "field": "#f3efe6",
+    "button": "#efe6d4",
+    "select": "#111111",
+    "ok": "#111111",
+    "warn": "#8a2e12",
+    "accent": "#ffe14a",
+}
 
 def app_folder():
     if getattr(sys, "frozen", False):
@@ -647,7 +660,8 @@ def open_agent_window(model, drives):
         "Ollama: " + ("online" if online else "not running. Click Link AI in the cleaner."),
         "Agent: " + (model or "hermes3"),
         "",
-        "I will write my answer here after each search finishes. Not one word at a time.",
+        "Ask about this scan in the Agent tab.",
+        "Example: search C: for cache folders larger than 200 MB",
         "",
     ])
     with _agent_lock:
@@ -666,29 +680,192 @@ def open_agent_window(model, drives):
         _agent_window_started = True
 
 
+def match_model(wanted, tags):
+    """Pick the installed tag that matches the saved agent name."""
+    wanted = (wanted or "").strip()
+    tags = [t for t in (tags or []) if t]
+    if not tags:
+        return wanted or "hermes3"
+    if wanted in tags:
+        return wanted
+    base = wanted.split(":")[0].lower()
+    for tag in tags:
+        low = tag.lower()
+        if low == base or low.startswith(base + ":"):
+            return tag
+    return tags[0]
+
+
 def prove_link(model):
     """Ask the selected agent to answer. True only if that model replies."""
+    attempts = (
+        {"format": "json", "user": 'Reply with exactly {"link":"ok"}'},
+        {"format": None, "user": "Reply with the single word ok"},
+    )
+    last = ""
+    for attempt in attempts:
+        payload = {
+            "model": model,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": "Reply with only what the user asked."},
+                {"role": "user", "content": attempt["user"]},
+            ],
+        }
+        if attempt["format"]:
+            payload["format"] = attempt["format"]
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            OLLAMA + "/api/chat", data=body, headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8", "replace"))
+        except Exception as exc:
+            last = str(exc)
+            continue
+        content = ((data.get("message") or {}).get("content")) or ""
+        folded = content.replace(" ", "").lower()
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            parsed = {}
+        ok = (
+            str(parsed.get("link") or "").lower() == "ok"
+            or '"link":"ok"' in folded
+            or content.strip().lower() in ("ok", "ok.", '"ok"')
+            or folded.startswith("ok")
+        )
+        if ok:
+            return True, content[:300]
+        last = content[:300] or last
+    return False, last or "The agent did not answer."
+
+
+def ollama_chat(model, messages, timeout=180):
     body = json.dumps({
         "model": model,
         "stream": False,
-        "format": "json",
-        "messages": [
-            {"role": "system", "content": "Reply with JSON only."},
-            {"role": "user", "content": 'Reply with exactly {"link":"ok"}'},
-        ],
+        "messages": messages,
     }).encode("utf-8")
     req = urllib.request.Request(
         OLLAMA + "/api/chat", data=body, headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=180) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         data = json.loads(resp.read().decode("utf-8", "replace"))
-    content = ((data.get("message") or {}).get("content")) or ""
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        parsed = {}
-    ok = str(parsed.get("link") or "").lower() == "ok" or '"link":"ok"' in content.replace(" ", "").lower()
-    return ok, content[:300]
+    return ((data.get("message") or {}).get("content")) or ""
+
+
+def parse_search_request(text):
+    """Turn a scan-related sentence into a narrower search. None if it is only a question."""
+    low = (text or "").lower()
+    triggers = (
+        "search", "scan", "find", "look for", "look through",
+        "narrow", "only show", "larger than", "bigger than", "over ",
+    )
+    if not any(word in low for word in triggers):
+        return None
+    min_bytes = MIN_SIZE
+    size_match = re.search(r"(\d+(?:\.\d+)?)\s*(gb|mb|kb)\b", low)
+    if size_match:
+        amount = float(size_match.group(1))
+        unit = {"kb": 1024, "mb": 1024 ** 2, "gb": 1024 ** 3}[size_match.group(2)]
+        min_bytes = max(MIN_SIZE, int(amount * unit))
+    letters = re.findall(r"\b([a-z]):(?:\\|\b)", low)
+    quoted = re.search(r"[\"']([^\"']+)[\"']", text or "")
+    name = ""
+    if quoted:
+        name = quoted.group(1).strip().lower()
+    else:
+        named = re.search(r"(?:named|called|containing|with)\s+([a-z0-9 ._()\-]{2,40})", low)
+        if named:
+            name = named.group(1).strip(" .")
+    include_pf = None
+    if "without program files" in low or "skip program files" in low:
+        include_pf = False
+    elif "program files" in low:
+        include_pf = True
+    return {
+        "min_bytes": min_bytes,
+        "drives": [letter.upper() + ":\\" for letter in letters],
+        "name": name,
+        "include_pf": include_pf,
+    }
+
+
+CHAT_RULES = """You are the local agent inside Leftover's.
+Answer only questions about this program, files and folders, or this Windows system.
+Use the scan facts and the web notes in the user message. Do not invent paths or web pages.
+If web notes are present, base the outside part of the answer on them and name the page title.
+If the question is about anything else, refuse in one sentence.
+You cannot delete files. Refuse Windows, OEM, Nahimic, installed apps, and any folder that still has a launcher.
+Keep the reply under 160 words."""
+
+TOPIC_WORDS = (
+    "leftover", "this app", "this program", "the program", "cleaner", "scan",
+    "dry-run", "dry run", "ollama", "agent", "hermes", "recycle", "uninstall", "github",
+    "file", "folder", "path", "directory", "cache", "temp", "exe", "dll",
+    "program files", "appdata", "extension",
+    "windows", "system", "drive", "disk", "registry", "service", "process",
+    "driver", "bios", "cpu", "gpu", "admin", "permission", "storage", "update",
+    "nahimic", "nvidia", "intel", "amd", "realtek",
+)
+WEB_CUES = (
+    "what", "why", "how", "should", "can i", "is it", "explain", "tell me",
+    "look up", "online", "internet", "web", "docs", "safe to", "error", "mean",
+)
+
+
+def on_topic(text):
+    low = (text or "").lower()
+    return any(word in low for word in TOPIC_WORDS)
+
+
+def wants_web(text):
+    low = (text or "").lower()
+    return any(cue in low for cue in WEB_CUES)
+
+
+def _plain(html):
+    text = re.sub(r"<[^>]+>", " ", html or "")
+    text = text.replace("&" + "amp;", "&")
+    text = text.replace("&" + "quot;", '"')
+    text = text.replace("&" + "#39;", "'")
+    text = text.replace("&" + "#x27;", "'")
+    text = text.replace("&" + "lt;", "<")
+    text = text.replace("&" + "gt;", ">")
+    text = text.replace("&" + "nbsp;", " ")
+    return " ".join(text.split())
+
+
+def internet_lookup(query, limit=4):
+    """Search the public web. Returns short notes. Empty if nothing comes back."""
+    encoded = urllib.parse.urlencode({"q": query[:180]})
+    req = urllib.request.Request(
+        "https://html.duckduckgo.com/html/?" + encoded,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Leftovers/1.9.1"},
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        page = resp.read().decode("utf-8", "replace")
+    blocks = re.findall(
+        r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>.*?class="result__snippet"[^>]*>(.*?)</a>',
+        page,
+        flags=re.I | re.S,
+    )
+    notes = []
+    for href, title, snippet in blocks:
+        if len(notes) >= limit:
+            break
+        real = href
+        parsed = urllib.parse.urlparse(href)
+        found = urllib.parse.parse_qs(parsed.query).get("uddg")
+        if found:
+            real = found[0]
+        title = _plain(title)
+        snippet = _plain(snippet)
+        if title:
+            notes.append(f"{title} | {snippet} | {real}")
+    return notes
 
 
 def find_ollama():
@@ -871,6 +1048,8 @@ class App(tk.Tk):
         self.include_pf = tk.BooleanVar(value=True)
         self.use_ai = tk.BooleanVar(value=True)
         self.model_var = tk.StringVar(value=saved_agent())
+        self.chat_turns = []
+        self.chat_busy = False
         self._style()
         self._build()
         self._log(f"Log: {LOG_FILE}")
@@ -902,40 +1081,61 @@ class App(tk.Tk):
         if "clam" in style.theme_names():
             style.theme_use("clam")
         bg, fg, field, btn = DARK["bg"], DARK["fg"], DARK["field"], DARK["button"]
-        style.configure(".", background=bg, foreground=fg, fieldbackground=field)
+        ink = "#111111"
+        paper = DARK["accent"]
+        style.configure(".", background=bg, foreground=fg, fieldbackground=field, font=("Tahoma", 9))
         style.configure("TFrame", background=bg)
-        style.configure("TLabel", background=bg, foreground=fg)
-        style.configure("TButton", background=btn, foreground=fg, padding=6)
-        style.map("TButton", background=[("active", "#505050")])
-        style.configure("TCheckbutton", background=bg, foreground=fg)
-        style.configure("TEntry", fieldbackground=field, foreground=fg)
-        style.configure("Treeview", background=field, foreground=fg, fieldbackground=field, rowheight=26)
-        style.configure("Treeview.Heading", background=btn, foreground=fg, relief="flat")
-        style.map("Treeview", background=[("selected", DARK["select"])], foreground=[("selected", "#ffffff")])
-        style.configure("TLabelframe", background=bg, foreground=fg)
-        style.configure("TLabelframe.Label", background=bg, foreground=fg)
-        style.configure("TNotebook", background=bg)
-        style.configure("TNotebook.Tab", background=btn, foreground=fg, padding=[10, 4])
-        style.map("TNotebook.Tab", background=[("selected", field)])
+        style.configure("Mast.TFrame", background=ink)
+        style.configure("TLabel", background=bg, foreground=fg, font=("Tahoma", 9))
+        style.configure("TButton", background=btn, foreground=fg, padding=6, borderwidth=2, relief="solid", font=("Tahoma", 9, "bold"))
+        style.map("TButton", background=[("active", paper)], foreground=[("active", ink)])
+        style.configure("Accent.TButton", background=paper, foreground=ink, padding=7, borderwidth=3, font=("Tahoma", 9, "bold"))
+        style.map("Accent.TButton", background=[("active", ink), ("disabled", btn)], foreground=[("active", paper), ("disabled", fg)])
+        style.configure("Mast.TButton", background=ink, foreground=paper, padding=6, borderwidth=2, font=("Courier New", 9, "bold"))
+        style.map("Mast.TButton", background=[("active", paper)], foreground=[("active", ink)])
+        style.configure("TCheckbutton", background=bg, foreground=fg, font=("Tahoma", 9))
+        style.configure("TEntry", fieldbackground=field, foreground=fg, bordercolor=ink, lightcolor=ink, darkcolor=ink)
+        style.configure("Treeview", background=field, foreground=fg, fieldbackground=field, rowheight=26, bordercolor=ink, font=("Tahoma", 9))
+        style.configure("Treeview.Heading", background=ink, foreground=paper, relief="flat", font=("Tahoma", 9, "bold"))
+        style.map("Treeview", background=[("selected", ink)], foreground=[("selected", paper)])
+        style.configure("TLabelframe", background=bg, foreground=fg, bordercolor=ink, borderwidth=2, relief="solid")
+        style.configure("TLabelframe.Label", background=bg, foreground=fg, font=("Tahoma", 9, "bold"))
+        style.configure("TNotebook", background=bg, bordercolor=ink, borderwidth=2)
+        style.configure("TNotebook.Tab", background=btn, foreground=fg, padding=[12, 6], bordercolor=ink, font=("Tahoma", 9, "bold"))
+        style.map("TNotebook.Tab", background=[("selected", ink)], foreground=[("selected", paper)])
+        style.configure("Header.TLabel", background=ink, foreground=paper, font=("Courier New", 22, "bold"))
+        style.configure("Subtle.TLabel", background=ink, foreground="#f3efe6", font=("Courier New", 9))
+        style.configure("TCombobox", fieldbackground=field, foreground=fg, bordercolor=ink, arrowcolor=ink)
 
     def _build(self):
-        top = ttk.Frame(self, padding=8)
+        header = ttk.Frame(self, padding=(12, 8), style="Mast.TFrame")
+        header.pack(fill=tk.X)
+        titles = ttk.Frame(header, style="Mast.TFrame")
+        titles.pack(side=tk.LEFT)
+        ttk.Label(titles, text="LEFTOVER'S", style="Header.TLabel").pack(anchor=tk.W)
+        ttk.Label(titles, text=f"VER {VERSION}   /   LOCAL SCAN", style="Subtle.TLabel").pack(anchor=tk.W)
+        ttk.Button(header, text="GITHUB", style="Mast.TButton", command=self.open_github).pack(side=tk.RIGHT, padx=(8, 0))
+        if not is_admin():
+            ttk.Button(header, text="ADMIN", style="Mast.TButton", command=self.on_relaunch).pack(side=tk.RIGHT)
+
+        top = ttk.Frame(self, padding=(14, 10, 14, 4))
         top.pack(fill=tk.X)
-        ttk.Button(top, text="Scan", command=self.scan).pack(side=tk.LEFT, padx=3)
+        ttk.Button(top, text="Scan", style="Accent.TButton", command=self.scan).pack(side=tk.LEFT, padx=(0, 6))
         ttk.Button(top, text="Delete selected", command=self.delete_selected).pack(side=tk.LEFT, padx=3)
         ttk.Button(top, text="Refresh deleted", command=self.refresh_deleted).pack(side=tk.LEFT, padx=3)
-        ttk.Checkbutton(top, text="Dry-run", variable=self.dry_run).pack(side=tk.LEFT, padx=6)
+        ttk.Checkbutton(top, text="Dry-run", variable=self.dry_run).pack(side=tk.LEFT, padx=(12, 6))
         ttk.Checkbutton(top, text="Program Files + (x86)", variable=self.include_pf).pack(side=tk.LEFT, padx=4)
-        ttk.Checkbutton(top, text="Local AI", variable=self.use_ai).pack(side=tk.LEFT, padx=4)
-        ttk.Label(top, text="Agent").pack(side=tk.LEFT, padx=(8, 2))
-        self.agent = ttk.Combobox(top, textvariable=self.model_var, width=22, state="readonly")
+
+        agent_row = ttk.Frame(self, padding=(14, 0, 14, 4))
+        agent_row.pack(fill=tk.X)
+        ttk.Checkbutton(agent_row, text="Local AI", variable=self.use_ai).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Label(agent_row, text="Agent").pack(side=tk.LEFT, padx=(0, 4))
+        self.agent = ttk.Combobox(agent_row, textvariable=self.model_var, width=24, state="readonly")
         self.agent.pack(side=tk.LEFT)
         self.agent.bind("<<ComboboxSelected>>", self.on_agent_change)
-        ttk.Button(top, text="Link AI", command=self.link_ai).pack(side=tk.LEFT, padx=4)
-        self.ai_status = ttk.Label(top, text="AI not checked")
-        self.ai_status.pack(side=tk.LEFT, padx=6)
-        if not is_admin():
-            ttk.Button(top, text="Relaunch as admin", command=self.on_relaunch).pack(side=tk.RIGHT, padx=3)
+        ttk.Button(agent_row, text="Link AI", style="Accent.TButton", command=self.link_ai).pack(side=tk.LEFT, padx=8)
+        self.ai_status = ttk.Label(agent_row, text="AI not linked")
+        self.ai_status.pack(side=tk.LEFT, padx=4)
 
         drive_box = ttk.LabelFrame(self, text="Drives", padding=6)
         drive_box.pack(fill=tk.X, padx=8, pady=4)
@@ -982,6 +1182,29 @@ class App(tk.Tk):
         self.tree.tag_configure("AI", foreground=DARK["warn"])
         self.tree.tag_configure("Rules", foreground=DARK["ok"])
 
+        agent_tab = ttk.Frame(self.book, padding=8)
+        self.book.add(agent_tab, text="  Agent  ")
+        ttk.Label(
+            agent_tab,
+            text="Ask about Leftover's, a file, or this system. The agent checks the web only for those questions.",
+            wraplength=860,
+        ).pack(anchor=tk.W, pady=(0, 6))
+        self.chat_log = scrolledtext.ScrolledText(
+            agent_tab, state="disabled", wrap=tk.WORD, height=16,
+            bg=DARK["field"], fg=DARK["fg"], insertbackground=DARK["fg"],
+            font=("Courier New", 10), relief=tk.SOLID, bd=2, padx=8, pady=8,
+        )
+        self.chat_log.pack(fill=tk.BOTH, expand=True)
+        self.chat_log.tag_configure("you", foreground="#111111", font=("Courier New", 10, "bold"))
+        self.chat_log.tag_configure("agent", foreground="#111111", font=("Courier New", 10))
+        ask = ttk.Frame(agent_tab)
+        ask.pack(fill=tk.X, pady=(8, 0))
+        self.chat_entry = ttk.Entry(ask)
+        self.chat_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.chat_entry.bind("<Return>", self.send_chat)
+        self.chat_send = ttk.Button(ask, text="Send", style="Accent.TButton", command=self.send_chat)
+        self.chat_send.pack(side=tk.LEFT, padx=(8, 0))
+
         deleted = ttk.Frame(self.book)
         self.book.add(deleted, text="  Recently deleted  ")
         self.del_tree = ttk.Treeview(deleted, columns=("size", "when", "from"), show="tree headings")
@@ -1000,11 +1223,107 @@ class App(tk.Tk):
 
         log_tab = ttk.Frame(self.book)
         self.book.add(log_tab, text="  Log  ")
-        self.log = scrolledtext.ScrolledText(log_tab, state="disabled", wrap=tk.WORD, bg=DARK["field"], fg=DARK["fg"], insertbackground=DARK["fg"])
+        self.log = scrolledtext.ScrolledText(log_tab, state="disabled", wrap=tk.WORD, bg=DARK["field"], fg=DARK["fg"], insertbackground=DARK["fg"], font=("Courier New", 9), relief=tk.SOLID, bd=2)
         self.log.pack(fill=tk.BOTH, expand=True)
 
-        self.status = ttk.Label(self, text="Ready", relief=tk.SUNKEN, anchor=tk.W)
+        self.status = ttk.Label(self, text="Ready", relief=tk.SUNKEN, anchor=tk.W, padding=(8, 4))
         self.status.pack(fill=tk.X, side=tk.BOTTOM)
+
+    def open_github(self):
+        webbrowser.open(GITHUB_URL)
+
+    def _chat_say(self, who, text):
+        def write():
+            self.chat_log.configure(state="normal")
+            tag = "you" if who == "You" else "agent"
+            self.chat_log.insert(tk.END, who + "\n", tag)
+            self.chat_log.insert(tk.END, text.strip() + "\n\n")
+            self.chat_log.see(tk.END)
+            self.chat_log.configure(state="disabled")
+        self.after(0, write)
+        agent_write(who + ": " + text.strip(), newline=True)
+        agent_write("", newline=True)
+
+    def send_chat(self, _event=None):
+        text = self.chat_entry.get().strip()
+        if not text or self.chat_busy:
+            return
+        self.chat_entry.delete(0, tk.END)
+        self._chat_say("You", text)
+        self.chat_busy = True
+        self.chat_send.configure(state="disabled")
+        threading.Thread(target=self._chat_work, args=(text,), daemon=True).start()
+
+    def _chat_done(self):
+        self.chat_busy = False
+        self.chat_send.configure(state="normal")
+
+    def _chat_work(self, text):
+        try:
+            saved = link_record()
+            model = match_model(self.model_var.get().strip() or saved.get("model") or "hermes3", ollama_tags())
+            linked = bool(saved.get("verified") and match_model(saved.get("model") or "", [model]) == model)
+            if not ollama_up():
+                self._chat_say("Agent", "Ollama is not running. Click Link AI, then ask again.")
+                return
+            if not saved.get("verified"):
+                self._chat_say("Agent", "The agent is not linked yet. Click Link AI and wait until it says the link is established.")
+                return
+            if not on_topic(text):
+                self._chat_say("Agent", "I only look things up for Leftover's, a file or folder, or this Windows system.")
+                return
+            spec = parse_search_request(text)
+            facts = []
+            if spec:
+                self._chat_say("Agent", "Searching this PC with that request. Protected folders stay off the list.")
+                drives = spec["drives"] or [d for d, var in self.drive_vars.items() if var.get()]
+                if not drives:
+                    self._chat_say("Agent", "Select a drive, or name one in the message, such as C:.")
+                    return
+                include_pf = self.include_pf.get() if spec["include_pf"] is None else spec["include_pf"]
+                self._scan_work(
+                    drives, include_pf, False, model,
+                    name_filter=spec["name"], min_bytes=spec["min_bytes"], quiet=True,
+                )
+                facts.append("This was a new search of this PC, not the previous list.")
+                if spec["name"]:
+                    facts.append("Name filter: " + spec["name"])
+                facts.append("Minimum size: " + human_size(spec["min_bytes"]))
+            if wants_web(text):
+                self._chat_say("Agent", "Checking the web for this question only.")
+                try:
+                    notes = internet_lookup(text)
+                except Exception as exc:
+                    notes = []
+                    facts.append("Web search failed: " + str(exc))
+                if notes:
+                    facts.append("Web notes:")
+                    facts.extend(notes)
+                elif "Web search failed" not in "\n".join(facts):
+                    facts.append("Web search returned no pages.")
+            shown = self.rows[:40]
+            if not shown and not spec:
+                facts.append("No leftovers are listed yet. Ask for a search, for example: search C: for cache folders larger than 200 MB")
+            else:
+                facts.append(f"Listed leftovers: {len(self.rows)}. Showing the first {len(shown)}.")
+                for row in shown:
+                    facts.append(
+                        f"{row['path']} | {human_size(row['size'])} | {row['confidence']:.0%} | {row['reason']}"
+                    )
+            messages = [{"role": "system", "content": CHAT_RULES}]
+            for turn in self.chat_turns[-6:]:
+                messages.append(turn)
+            user = "Scan facts:\n" + "\n".join(facts) + "\n\nUser:\n" + text
+            messages.append({"role": "user", "content": user})
+            reply = ollama_chat(model, messages).strip() or "The agent returned nothing."
+            self.chat_turns.append({"role": "user", "content": text})
+            self.chat_turns.append({"role": "assistant", "content": reply})
+            self.chat_turns = self.chat_turns[-8:]
+            self._chat_say("Agent", reply)
+        except Exception as exc:
+            self._chat_say("Agent", "The agent could not answer: " + str(exc))
+        finally:
+            self.after(0, self._chat_done)
 
     def _log(self, msg):
         logger.info(msg)
@@ -1041,6 +1360,10 @@ class App(tk.Tk):
         def work():
             try:
                 open_agent_window(model, drives)
+                self._chat_say(
+                    "Agent",
+                    "Ask me about this scan. I can search again if you name a drive, a folder, or a size.",
+                )
                 self._log("Agent window opened. Greeting, drive space, last scan, and restored space are there.")
             except Exception as exc:
                 self._log("Could not open the agent window: " + str(exc))
@@ -1116,7 +1439,7 @@ class App(tk.Tk):
                 self.after(0, pull)
                 return
             current = self.model_var.get().strip()
-            chosen = current if current in tags else tags[0]
+            chosen = match_model(current, tags)
             self._log("Asking " + chosen + " to answer on " + OLLAMA)
             try:
                 ok, reply = prove_link(chosen)
@@ -1202,7 +1525,7 @@ class App(tk.Tk):
         self.ctx_path = ""
         self.ctx = tk.Menu(
             self, tearoff=0, bg=DARK["field"], fg=DARK["fg"],
-            activebackground=DARK["select"], activeforeground="#ffffff",
+            activebackground="#111111", activeforeground="#ffe14a",
         )
         self.ctx.add_command(label="Select / deselect", command=self.ctx_toggle)
         self.ctx.add_separator()
@@ -1389,7 +1712,7 @@ class App(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _scan_work(self, drives, include_pf, use_ai, model):
+    def _scan_work(self, drives, include_pf, use_ai, model, name_filter="", min_bytes=None, quiet=False):
         self._log("Reading installed apps...")
         apps, err = ps_json(APPS_PS, timeout=120)
         if err:
@@ -1445,6 +1768,8 @@ class App(tk.Tk):
                     seen.add(key)
                     if is_blocked_name(child.name) or is_nahimic(child):
                         continue
+                    if name_filter and name_filter not in child.name.lower() and name_filter not in key:
+                        continue
                     if child.name.lower() in PERSONAL_NAMES or looks_personal(child):
                         continue
                     if installed_owns(child, install_roots):
@@ -1460,7 +1785,8 @@ class App(tk.Tk):
                     if score >= 0.62:
                         continue
                     size = folder_size(child)
-                    if size < MIN_SIZE:
+                    need = MIN_SIZE if min_bytes is None else max(MIN_SIZE, int(min_bytes))
+                    if size < need:
                         continue
                     launcher = has_launcher(child)
                     reason = []
@@ -1499,7 +1825,7 @@ class App(tk.Tk):
         found_paths = {r["path"].lower() for r in found}
         if use_ai:
             tags = ollama_tags()
-            chosen = model if model in tags or any(model.split(":")[0] in t for t in tags) else (tags[0] if tags else model)
+            chosen = match_model(model, tags) if tags else model
             agent_write("", newline=True)
             agent_write("Scan update", newline=True)
             agent_write(
@@ -1584,7 +1910,8 @@ class App(tk.Tk):
             msg = f"{len(found)} leftovers on {len(drives)} drive(s). Stopped {len(stopped_copy)} folders at an .exe."
             self.status.configure(text=msg)
             self._log("Scan finished. " + msg)
-            self._exe_stop_dialog(stopped_copy)
+            if not quiet:
+                self._exe_stop_dialog(stopped_copy)
         self.after(0, show)
 
     def refresh_deleted(self):
